@@ -4,23 +4,28 @@ import {apiresponse}from '../utils/responsehandler.js'
 import { Pdf } from '../models/pdf.model.js'
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cloudinary from '../middlewares/cloudinary.middelware.js';
 import fs from 'fs';
+import { User } from '../models/user.model.js';
 
 // Get __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const uploadpdf=asynchandler(async(req,res)=>{
- const filename=req.file.filename
+//  const filename=req.file.filename
  
 
  try {
+    
+    const result= await cloudinary.uploader.upload(req.file.path)
    let data=await  Pdf.create({
-        filename,
+        file_url:result.secure_url,
+        cloudinary_id:result.public_id
        
      })
      res.json({
-        status:"ok"
+        status:"File created"
      })
     
  } catch (error) {
@@ -35,24 +40,25 @@ const getpdf=asynchandler(async(req,res)=>{
         let data=await Pdf.find({})
         res.send(data)
     } catch (error) {
-        
+        console.log(error)
     }
 })
 
 const deletepdf=asynchandler(async(req,res)=>{
-    const oldFilename = req.params.filename;
-    const oldFilePath = path.join(__dirname, '../public/uploads', oldFilename);
-   fs.unlink(oldFilePath,(err)=>
-    {
-        if (err) {
-            // Handle error if file does not exist or cannot be deleted
-            return res.status(500).json({ message: 'Failed to delete file' });
-          }
+  
+    try {
+        let pdf=await Pdf.findById(req.params.id)
+
+        await cloudinary.uploader.destroy(pdf.cloudinary_id);
+
+         await Pdf.deleteOne({cloudinary_id:pdf.cloudinary_id})
+         res.json({File:"Deleted"})
       
-          res.json({ message: 'File deleted successfully' });
-      
-    })
-    await  Pdf.deleteOne({filename:oldFilename})
+
+
+    } catch (error) {
+        console.log(error)
+    }
    
 
      
@@ -60,41 +66,24 @@ const deletepdf=asynchandler(async(req,res)=>{
 })
 
 const updatepdf=asynchandler(async(req,res)=>{
-    const oldFilename = req.params.filename;
-    const oldFilePath = path.join(__dirname, '../public/uploads', oldFilename);
-
-    fs.unlink(oldFilePath,(err)=>
-        {
-            if (err) {
-                // Handle error if file does not exist or cannot be deleted
-                return res.status(500).json({ message: 'Failed to delete file' });
-              }
-          
-             
-          
-        })
-        await  Pdf.deleteOne({filename:oldFilename})
-
-
-
-
-        const filename=req.file.filename
- 
-
- try {
-let data=await Pdf.create({
-        filename,
-       
-     })
-     res.json(
-        new apiresponse(200,data,"Data updated")
-     )
-    
- } catch (error) {
    
-    throw new apierror(400,"Error while uploading file")
- }
- 
+    try {
+        let pdf=await Pdf.findById(req.params.id)
+
+        await cloudinary.uploader.destroy(pdf.cloudinary_id);
+      
+        const result= await cloudinary.uploader.upload(req.file.path)
+        let data={
+             file_url:result.secure_url || pdf.file_url,
+             cloudinary_id:result.public_id ||pdf.cloudinary_id
+            
+        }
+
+        pdf=await Pdf.findByIdAndUpdate(req.params.id,data,{new:true})
+        res.json(pdf)
+    } catch (error) {
+        console.log(error)
+    }
 
 
 })
