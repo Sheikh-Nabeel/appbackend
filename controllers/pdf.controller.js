@@ -5,11 +5,7 @@ import { Pdf } from '../models/pdf.model.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cloudinary from '../middlewares/cloudinary.middelware.js';
-import fs from 'fs';
-
-// Get __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const _dirname = path.dirname(_filename);
+ 
 
 // Upload PDF and Save to Cloudinary
 const uploadpdf = asynchandler(async (req, res) => {
@@ -42,7 +38,7 @@ const uploadpdf = asynchandler(async (req, res) => {
     });
 
     // Optionally delete the file from the server after upload
-    fs.unlinkSync(req.file.path);
+    
 
   } catch (error) {
     throw new apierror(400, "Error while uploading file");
