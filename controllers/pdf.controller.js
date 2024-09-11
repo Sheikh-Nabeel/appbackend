@@ -1,95 +1,129 @@
-import {apierror}from '../utils/apierror.js'
-import {asynchandler}from '../utils/asynchandler.js'
-import {apiresponse}from '../utils/responsehandler.js'
-import { Pdf } from '../models/pdf.model.js'
+import { apierror } from '../utils/apierror.js';
+import { asynchandler } from '../utils/asynchandler.js';
+import { apiresponse } from '../utils/responsehandler.js';
+import { Pdf } from '../models/pdf.model.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cloudinary from '../middlewares/cloudinary.middelware.js';
 import fs from 'fs';
-import { User } from '../models/user.model.js';
 
 // Get __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _dirname = path.dirname(_filename);
 
-const uploadpdf=asynchandler(async(req,res)=>{
-//  const filename=req.file.filename
- 
+// Upload PDF and Save to Cloudinary
+const uploadpdf = asynchandler(async (req, res) => {
+  try {
+    // Upload PDF to Cloudinary as a raw file
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: "raw",
+      format: "pdf",  // Ensures it's a PDF
+      public_id: req.file.originalname.replace('.pdf', ''),
+      access_mode: "public",
+    });
 
- try {
-    
-    const result= await cloudinary.uploader.upload(req.file.path,{
-        resource_type:"raw",
-        access_mode:"public",
-        format:"pdf"
-    })
-   let data=await  Pdf.create({
-        file_url:result.secure_url,
-        cloudinary_id:result.public_id
-       
-     })
-     res.json({
-        status:"File created"
-     })
-    
- } catch (error) {
-   
-    throw new apierror(400,"Error while uploading file")
- }
- 
-})
+    // Force the file to download with a .pdf extension
+    const downloadUrl = cloudinary.url(result.public_id + ".pdf", {
+      resource_type: "raw",
+      flags: "attachment"
+    });
 
-const getpdf=asynchandler(async(req,res)=>{
-    try {
-        let data=await Pdf.find({})
-        res.send(data)
-    } catch (error) {
-        console.log(error)
-    }
-})
+    // Save the download URL to the database instead of the Cloudinary secure URL
+    let data = await Pdf.create({
+      file_url: downloadUrl, // Storing the download URL
+      cloudinary_id: result.public_id
+    });
 
-const deletepdf=asynchandler(async(req,res)=>{
-  
-    try {
-        let pdf=await Pdf.findById(req.params.id)
+    // Respond with success and the download URL
+    res.json({
+      status: "File created",
+      download_url: downloadUrl,
+      data: data
+    });
 
-        await cloudinary.uploader.destroy(pdf.cloudinary_id);
+    // Optionally delete the file from the server after upload
+    fs.unlinkSync(req.file.path);
 
-         await Pdf.deleteOne({cloudinary_id:pdf.cloudinary_id})
-         res.json({File:"Deleted"})
-      
+  } catch (error) {
+    throw new apierror(400, "Error while uploading file");
+  }
+});
 
+// Get All PDFs
+const getpdf = asynchandler(async (req, res) => {
+  try {
+    let data = await Pdf.find({});
+    res.send(data);
+  } catch (error) {
+    console.log(error);
+    throw new apierror(500, "Error fetching PDFs");
+  }
+});
 
-    } catch (error) {
-        console.log(error)
-    }
-   
+// Delete PDF
+const deletepdf = asynchandler(async (req, res) => {
+  try {
+    let pdf = await Pdf.findById(req.params.id);
 
-     
+    // Delete the file from Cloudinary
+    await cloudinary.uploader.destroy(pdf.cloudinary_id, {
+      resource_type: "raw"
+    });
 
-})
+    // Delete from the database
+    await Pdf.deleteOne({ cloudinary_id: pdf.cloudinary_id });
+    res.json({ message: "File deleted" });
 
-const updatepdf=asynchandler(async(req,res)=>{
-   
-    try {
-        let pdf=await Pdf.findById(req.params.id)
+  } catch (error) {
+    console.log(error);
+    throw new apierror(500, "Error deleting file");
+  }
+});
 
-        await cloudinary.uploader.destroy(pdf.cloudinary_id);
-      
-        const result= await cloudinary.uploader.upload(req.file.path)
-        let data={
-             file_url:result.secure_url || pdf.file_url,
-             cloudinary_id:result.public_id ||pdf.cloudinary_id
-            
-        }
+// Update PDF
+const updatepdf = asynchandler(async (req, res) => {
+  try {
+    let pdf = await Pdf.findById(req.params.id);
 
-        pdf=await Pdf.findByIdAndUpdate(req.params.id,data,{new:true})
-        res.json(pdf)
-    } catch (error) {
-        console.log(error)
-    }
+    // Delete the old PDF from Cloudinary
+    await cloudinary.uploader.destroy(pdf.cloudinary_id, {
+      resource_type: "raw"
+    });
 
+    // Upload the new file to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: "raw",
+      format: "pdf",
+      public_id: req.file.originalname.replace('.pdf', ''),
+      access_mode: "public"
+    });
 
-})
+    // Construct the new download URL
+    const downloadUrl = cloudinary.url(result.public_id + ".pdf", {
+      resource_type: "raw",
+      flags: "attachment"
+    });
 
-export {uploadpdf,getpdf,deletepdf,updatepdf}
+    // Update the PDF details in the database with the download URL
+    let data = {
+      file_url: downloadUrl, // Updating with the new download URL
+      cloudinary_id: result.public_id || pdf.cloudinary_id
+    };
+
+    pdf = await Pdf.findByIdAndUpdate(req.params.id, data, { new: true });
+    res.json({
+      status: "File updated",
+      download_url: downloadUrl,
+      data: pdf
+    });
+
+    // Optionally delete the new file from the server after upload
+    fs.unlinkSync(req.file.path);
+
+  } catch (error) {
+    console.log(error);
+    throw new apierror(500, "Error updating file");
+  }
+});
+
+export { uploadpdf, getpdf, deletepdf, updatepdf };
