@@ -18,7 +18,10 @@ const uploadpdf=asynchandler(async(req,res)=>{
 
  try {
     
-    const result= await cloudinary.uploader.upload(req.file.path)
+    const result= await cloudinary.uploader.upload(req.file.path,{
+        resource_type:"auto",
+        access_mode:"public"
+    })
    let data=await  Pdf.create({
         file_url:result.secure_url,
         cloudinary_id:result.public_id
