@@ -7,13 +7,13 @@ import { User } from '../models/user.model.js'
 
 const registeruser=asynchandler(async (req,res)=>{
 
-    const {username,email,password}=req.body;
+    const {username,email,password,cnic}=req.body;
     if ([email,username,password].some((fields)=>fields?.trim()==="")) {
         throw new apierror(400,"all fields are required")
     }
 
     const existedemail= await User.findOne({
-        $or:[{email}]
+        $or:[{email},{cnic}]
     });
     if (existedemail) {
         throw new apierror(409,"Email adress already exists")
@@ -22,6 +22,7 @@ const registeruser=asynchandler(async (req,res)=>{
     let user = await User.create({
         username,
         email,
+        cnic,
         password,
     })
     const createduser=await User.findById(user._id).select("-password")
@@ -55,4 +56,16 @@ if (existeduser) {
 }
 
 })
-export {registeruser,loginuser}
+
+const forgetpassword=asynchandler(async(req,res)=>{
+
+    const {email,cnic,newpassword}=req.body
+
+    const user=await User.findOne({email:email,cnic:cnic})
+    if (user) {
+      user.password=newpassword
+        user.save()
+     return   res.json(user)
+    }
+})
+export {registeruser,loginuser,forgetpassword}

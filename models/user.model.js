@@ -14,6 +14,10 @@ const userschema=new Schema({
         lowercase: true,
         trim: true,
     },
+    cnic:{
+        type:Number,
+        required:true
+    },
     password:{
         type:String,
         required:true
