@@ -68,4 +68,28 @@ const forgetpassword=asynchandler(async(req,res)=>{
      return   res.json(user)
     }
 })
-export {registeruser,loginuser,forgetpassword}
+const updatename=asynchandler(async(req,res)=>{
+
+    const {email,newusername}=req.body
+
+    const user=await User.findOne({email:email})
+    if (user) {
+      user.username=newusername
+        user.save()
+     return   res.json(user)
+    }
+})
+const deleteuser=asynchandler(async(req,res)=>{
+
+    const {email}=req.body
+
+    const user=await User.deleteOne({email:email})
+    if (user) {
+       
+        
+     return   res.json("user deleted successfully")
+    }
+})
+
+
+export {registeruser,loginuser,forgetpassword,deleteuser,updatename}
